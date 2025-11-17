@@ -5,13 +5,19 @@ console.log("Logs from your program will appear here!");
 
 // TODO: Uncomment the code below to pass the first stage
 const server: net.Server = net.createServer((socket) => {
-  socket.on("data", (chunk) => {
+  socket.on("data", (chunk: Buffer) => {
     const request = chunk.toString();
     const [requestLine] = request.split("\r\n");
     const [method, path] = requestLine.split(" ");
-    console.log(path);
     if (path === "/") {
       socket.write("HTTP/1.1 200 OK\r\n\r\n");
+      return;
+    }
+    if (path.startsWith("/echo")) {
+      const text: string = path.replace("/echo/", "");
+      socket.write(
+        `HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: ${text.length}\r\n\r\n${text}`,
+      );
       return;
     }
     socket.write("HTTP/1.1 404 Not Found\r\n\r\n");
