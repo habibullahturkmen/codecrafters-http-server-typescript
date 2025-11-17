@@ -20,6 +20,16 @@ const server: net.Server = net.createServer((socket) => {
       );
       return;
     }
+    if (path.startsWith("/user-agent")) {
+      const userAgent = request
+        .split("\r\n")
+        .filter((requestItems) => requestItems.includes("User-Agent: "))[0]
+        .replace("User-Agent: ", "");
+      socket.write(
+        `HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: ${userAgent.length}\r\n\r\n${userAgent}`,
+      );
+      return;
+    }
     socket.write("HTTP/1.1 404 Not Found\r\n\r\n");
   });
   socket.on("close", () => {
