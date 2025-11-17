@@ -8,58 +8,107 @@ const directoryFlag =
 const server: net.Server = net.createServer((socket) => {
   socket.on("data", async (chunk: Buffer) => {
     const request = chunk.toString();
-    const [requestLine] = request.split("\r\n");
-    const [method, path] = requestLine.split(" ");
 
-    if (path === "/") {
-      socket.write("HTTP/1.1 200 OK\r\n\r\n");
-      return;
+    const headerEndIndex = request.indexOf("\r\n\r\n");
+    if (headerEndIndex === -1) return;
+
+    const headers: string[] = request
+      .substring(0, headerEndIndex)
+      .split("\r\n");
+
+    const [requestLineHeader] = request.split("\r\n");
+    const [method, path, httpVersion] = requestLineHeader.split(" ");
+    const host: string | undefined = headers
+      .find((h) => h.includes("Host"))
+      ?.replace("Host: ", "");
+    const userAgent: string | undefined = headers
+      .find((h) => h.includes("User-Agent"))
+      ?.replace("User-Agent: ", "");
+    const accept: string | undefined = headers
+      .find((h) => h.includes("Accept"))
+      ?.replace("Accept: ", "");
+    const contentType: string | undefined = headers
+      .find((h) => h.includes("Content-Type"))
+      ?.replace("Content-Type: ", "");
+    const contentLength: string | undefined = headers
+      .find((h) => h.includes("Content-Length"))
+      ?.replace("Content-Length: ", "");
+    const body: string = request.substring(headerEndIndex + 4, request.length);
+
+    switch (method) {
+      case "GET":
+        if (path === "/") {
+          socket.write(`${httpVersion} 200 OK\r\n\r\n`);
+          return;
+        }
+
+        if (path.startsWith("/echo")) {
+          const text: string =
+            path === "/echo"
+              ? path.replace("/echo", "")
+              : path.replace("/echo/", "");
+
+          socket.write(
+            `${httpVersion} 200 OK\r\nContent-Type: text/plain\r\nContent-Length: ${text.length}\r\n\r\n${text}`,
+          );
+          return;
+        }
+
+        if (path.startsWith("/files")) {
+          const fileName: string =
+            path === "/files"
+              ? path.replace("/files", "")
+              : path.replace("/files/", "");
+
+          const file = Bun.file(`${directoryFlag}${fileName}`);
+          const fileContent: string | boolean = await file
+            .text()
+            .catch(() => socket.write(`${httpVersion} 404 Not Found\r\n\r\n`));
+
+          if (typeof fileContent === "boolean") {
+            return;
+          }
+
+          socket.write(
+            `${httpVersion} 200 OK\r\nContent-Type: ${contentType ?? "application/octet-stream"}\r\nContent-Length: ${contentLength ?? fileContent.length}\r\n\r\n${fileContent}`,
+          );
+          return;
+        }
+
+        if (path === "/user-agent" || path === "/user-agent/") {
+          socket.write(
+            `${httpVersion} 200 OK\r\nContent-Type: ${contentType ?? "text/plain"}\r\nContent-Length: ${contentLength ?? userAgent?.length}\r\n\r\n${userAgent}`,
+          );
+          return;
+        }
+        break;
+      case "POST":
+        if (path.startsWith("/files")) {
+          const fileName: string =
+            path === "/files"
+              ? path.replace("/files", "")
+              : path.replace("/files/", "");
+
+          await Bun.write(`${directoryFlag}${fileName}`, `${body}`);
+
+          const file = Bun.file(`${directoryFlag}${fileName}`);
+          const fileContent: string | boolean = await file
+            .text()
+            .catch(() => socket.write(`${httpVersion} 404 Not Found\r\n\r\n`));
+
+          if (typeof fileContent === "boolean") {
+            return;
+          }
+
+          socket.write(
+            `${httpVersion} 201 Created\r\nContent-Type: ${contentType}\r\nContent-Length: ${contentLength}\r\n\r\n${body}`,
+          );
+          return;
+        }
+        break;
     }
 
-    if (path.startsWith("/echo")) {
-      const text: string =
-        path === "/echo"
-          ? path.replace("/echo", "")
-          : path.replace("/echo/", "");
-      socket.write(
-        `HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: ${text.length}\r\n\r\n${text}`,
-      );
-      return;
-    }
-
-    if (path.startsWith("/files")) {
-      const fileName: string =
-        path === "/files"
-          ? path.replace("/files", "")
-          : path.replace("/files/", "");
-
-      const file = Bun.file(`${directoryFlag}${fileName}`);
-      const fileContent: string | boolean = await file
-        .text()
-        .catch(() => socket.write("HTTP/1.1 404 Not Found\r\n\r\n"));
-
-      if (typeof fileContent === "boolean") {
-        return;
-      }
-
-      socket.write(
-        `HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: ${(fileContent as string).length}\r\n\r\n${fileContent}`,
-      );
-      return;
-    }
-
-    if (path === "/user-agent" || path === "/user-agent/") {
-      const userAgent = request
-        .split("\r\n")
-        .filter((requestItems) => requestItems.includes("User-Agent: "))[0]
-        .replace("User-Agent: ", "");
-      socket.write(
-        `HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: ${userAgent.length}\r\n\r\n${userAgent}`,
-      );
-      return;
-    }
-
-    socket.write("HTTP/1.1 404 Not Found\r\n\r\n");
+    socket.write(`${httpVersion} 404 Not Found\r\n\r\n`);
   });
 
   socket.on("close", () => {
