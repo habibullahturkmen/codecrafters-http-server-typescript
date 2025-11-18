@@ -33,6 +33,9 @@ const server: net.Server = net.createServer((socket) => {
     const contentLength: string | undefined = headers
       .find((h) => h.includes("Content-Length"))
       ?.replace("Content-Length: ", "");
+    const acceptEncoding: string | undefined = headers
+      .find((h) => h.includes("Accept-Encoding"))
+      ?.replace("Accept-Encoding: ", "");
     const body: string = request.substring(headerEndIndex + 4, request.length);
 
     switch (method) {
@@ -47,6 +50,13 @@ const server: net.Server = net.createServer((socket) => {
             path === "/echo"
               ? path.replace("/echo", "")
               : path.replace("/echo/", "");
+
+          if (acceptEncoding === "gzip") {
+            socket.write(
+              `${httpVersion} 200 OK\r\nContent-Type: text/plain\r\nContent-Encoding: ${acceptEncoding}\r\n\r\n`,
+            );
+            return;
+          }
 
           socket.write(
             `${httpVersion} 200 OK\r\nContent-Type: text/plain\r\nContent-Length: ${text.length}\r\n\r\n${text}`,
