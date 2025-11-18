@@ -55,9 +55,11 @@ const server: net.Server = net.createServer((socket) => {
             .filter((encoding) => encoding === "gzip")[0];
 
           if (gzip) {
+            const gzipped = Bun.gzipSync(text);
             socket.write(
-              `${httpVersion} 200 OK\r\nContent-Type: text/plain\r\nContent-Encoding: ${gzip}\r\n\r\n`,
+              `${httpVersion} 200 OK\r\nContent-Encoding: ${gzip}\r\nContent-Type: text/plain\r\nContent-Length: ${gzipped.length}\r\n\r\n`,
             );
+            socket.write(gzipped);
             return;
           }
 
