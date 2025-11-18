@@ -50,10 +50,13 @@ const server: net.Server = net.createServer((socket) => {
             path === "/echo"
               ? path.replace("/echo", "")
               : path.replace("/echo/", "");
+          const gzip = acceptEncoding
+            ?.split(", ")
+            .filter((encoding) => encoding === "gzip")[0];
 
-          if (acceptEncoding === "gzip") {
+          if (gzip) {
             socket.write(
-              `${httpVersion} 200 OK\r\nContent-Type: text/plain\r\nContent-Encoding: ${acceptEncoding}\r\n\r\n`,
+              `${httpVersion} 200 OK\r\nContent-Type: text/plain\r\nContent-Encoding: ${gzip}\r\n\r\n`,
             );
             return;
           }
