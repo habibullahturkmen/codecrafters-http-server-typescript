@@ -53,9 +53,10 @@ const server: net.Server = net.createServer((socket: net.Socket) => {
 
         if (path.startsWith("/echo")) {
           const text: string =
-            path === "/echo"
-              ? path.replace("/echo", "")
-              : path.replace("/echo/", "");
+            path.includes("/echo/")
+              ? path.replace("/echo/", "")
+              : path.replace("/echo", "");
+
           const gzip = acceptEncoding
             ?.split(", ")
             .filter((encoding) => encoding === "gzip")[0];
